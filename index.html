@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SET MIND — small software that stays out of your way</title>
+<meta name="description" content="SET MIND builds small, focused software: browser extensions, Android apps, desktop tools, and web apps. Most run offline. No accounts, no tracking.">
+<meta property="og:title" content="SET MIND">
+<meta property="og:description" content="Small software that stays out of your way. Extensions, Android apps, desktop tools, web apps.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230b0e14'/><circle cx='50' cy='50' r='22' fill='none' stroke='%236fa8ff' stroke-width='7'/></svg>">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0e14; --bg2:#0f141d; --card:#141a24; --line:#232d3d;
+  --txt:#e8ecf3; --dim:#8d99ad; --accent:#6fa8ff; --ok:#5fd8a4;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* header */
+header{position:sticky;top:0;z-index:20;background:rgba(11,14,20,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.hrow{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.14em;font-size:15px}
+.brand .dot{width:22px;height:22px;border-radius:50%;border:3px solid var(--accent);flex:none}
+nav a{color:var(--dim);font-size:14px;margin-left:22px}
+nav a:hover{color:var(--txt);text-decoration:none}
+@media(max-width:620px){nav a{margin-left:14px;font-size:13px}.brand{font-size:13px}}
+
+/* hero */
+.hero{padding:88px 0 56px;border-bottom:1px solid var(--line)}
+.hero h1{font-size:clamp(32px,6vw,54px);line-height:1.12;letter-spacing:-.02em;font-weight:700;max-width:16ch}
+.hero p{color:var(--dim);font-size:clamp(16px,2.4vw,19px);margin-top:22px;max-width:56ch}
+.tagrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+.tag{border:1px solid var(--line);background:var(--bg2);color:var(--dim);font-size:13px;padding:6px 13px;border-radius:999px}
+
+/* filters */
+.filters{display:flex;flex-wrap:wrap;gap:9px;margin:44px 0 26px}
+.filters button{background:var(--bg2);border:1px solid var(--line);color:var(--dim);font:inherit;font-size:14px;padding:8px 16px;border-radius:999px;cursor:pointer;transition:.15s}
+.filters button:hover{color:var(--txt);border-color:#38455c}
+.filters button.on{background:var(--accent);border-color:var(--accent);color:#08111f;font-weight:600}
+
+/* grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;padding-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;transition:.18s}
+.card:hover{border-color:#3c4c66;transform:translateY(-2px)}
+.card h3{font-size:19px;font-weight:650;letter-spacing:-.01em}
+.card .plat{display:inline-block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:3px 8px;margin-bottom:13px;align-self:flex-start}
+.card p{color:var(--dim);font-size:14.5px;margin-top:9px;flex:1}
+.card .foot{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.pill.live{color:var(--ok);border-color:#25543f;background:#12241b}
+.pill.soon{color:#e3b95f;border-color:#4d3d1c;background:#231c0e}
+.pill.price{color:var(--txt)}
+.card a.go{margin-left:auto;font-size:14px;font-weight:600}
+
+/* sections */
+section{padding:56px 0;border-top:1px solid var(--line)}
+section h2{font-size:26px;letter-spacing:-.01em;margin-bottom:14px}
+section p.lede{color:var(--dim);max-width:64ch}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:26px;margin-top:26px}
+.two h4{font-size:15px;margin-bottom:6px}
+.two p{color:var(--dim);font-size:14.5px}
+
+footer{border-top:1px solid var(--line);padding:40px 0 56px;color:var(--dim);font-size:14px}
+footer .frow{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+
+<header>
+ <div class="wrap hrow">
+  <div class="brand"><span class="dot"></span>SET MIND</div>
+  <nav>
+   <a href="#apps">Apps</a>
+   <a href="#about">About</a>
+   <a href="#contact">Contact</a>
+  </nav>
+ </div>
+</header>
+
+<div class="wrap">
+ <div class="hero">
+  <h1>Small software that stays out of your way.</h1>
+  <p>SET MIND makes focused tools — browser extensions, Android apps, desktop utilities, and web apps. Most run entirely on your own machine. No accounts to make, nothing phoning home.</p>
+  <div class="tagrow">
+   <span class="tag">Browser extensions</span>
+   <span class="tag">Android apps</span>
+   <span class="tag">Windows tools</span>
+   <span class="tag">Web apps</span>
+   <span class="tag">Offline-first</span>
+  </div>
+ </div>
+</div>
+
+<div class="wrap" id="apps">
+ <div class="filters">
+  <button class="on" data-f="all">All</button>
+  <button data-f="ext">Browser extensions</button>
+  <button data-f="android">Android</button>
+  <button data-f="desktop">Desktop</button>
+  <button data-f="web">Web apps</button>
+ </div>
+
+ <div class="grid" id="grid"></div>
+</div>
+
+<div class="wrap">
+ <section id="about">
+  <h2>What we sell, and how</h2>
+  <p class="lede">SET MIND is a one-person software studio. Products are sold as one-off purchases or small subscriptions, paid by card through Stripe. Some tools are free. Everything is listed above with its current price and status.</p>
+  <div class="two">
+   <div>
+    <h4>Delivery</h4>
+    <p>Digital only. After payment you get an immediate download link or licence key by email — nothing is shipped.</p>
+   </div>
+   <div>
+    <h4>Your data</h4>
+    <p>Most tools store everything locally on your device. Where a product syncs or checks a licence, that is stated on the product itself.</p>
+   </div>
+   <div>
+    <h4>Refunds</h4>
+    <p>Not happy within 30 days? Email and you get your money back. No form, no questions.</p>
+   </div>
+   <div>
+    <h4>Support</h4>
+    <p>One person answers, usually within a couple of days. Bug reports and feature asks go to the same address.</p>
+   </div>
+  </div>
+ </section>
+
+ <section id="contact">
+  <h2>Contact</h2>
+  <p class="lede">Questions, refunds, bugs, or licence trouble — <a href="mailto:wizzing1212@gmail.com">wizzing1212@gmail.com</a>.</p>
+ </section>
+</div>
+
+<footer>
+ <div class="wrap frow">
+  <div>&copy; <span id="yr"></span> SET MIND</div>
+  <div><a href="mailto:wizzing1212@gmail.com">wizzing1212@gmail.com</a></div>
+ </div>
+</footer>
+
+<script>
+const APPS = [
+ {n:"Scroll Feet — Degen Meter", plat:"Firefox extension", f:"ext", status:"live",
+  price:"Free · Premium $3/mo",
+  d:"Turns your scrolling into real feet. Green while you're chill, red once you've doomscrolled past your usual day. One-click share. Premium adds weekly, monthly, yearly and lifetime stats.",
+  link:"", linkTxt:""},
+
+ {n:"Walk Star", plat:"Android app", f:"android", status:"live",
+  price:"Free",
+  d:"A habit tracker that grows a star instead of a streak. Marks you draw are carved into the star's light; skip a day and nothing punishes you. Works on Android 7 and up, offline.",
+  link:"", linkTxt:""},
+
+ {n:"Symbolysis", plat:"Web app · installable", f:"web", status:"live",
+  price:"Free",
+  d:"Asks you one small question about a topic — \"the number 7, if it were a dance\" — and you draw the first thing that appears. Spaced repetition underneath, so ideas resurface just as they fade. Runs offline, saves in your browser.",
+  link:"", linkTxt:""},
+
+ {n:"Voice Counter", plat:"Windows app", f:"desktop", status:"live",
+  price:"Free · Premium stats",
+  d:"Counts how many times you say a chosen phrase while you game. Each one drops a grain of sand into a pile — louder is bigger, faster is brighter. 100% offline speech recognition, zero performance hit while you play.",
+  link:"", linkTxt:""},
+
+ {n:"DASHCALL", plat:"Windows app", f:"desktop", status:"live",
+  price:"Contact",
+  d:"Reads your project, finds people online describing the problem it solves, and hands you a list to message. Leads, warm-up threads, and content ideas in one dashboard.",
+  link:"", linkTxt:""},
+
+ {n:"HeatPad", plat:"Web app · Windows", f:"web", status:"live",
+  price:"Free",
+  d:"An infinite canvas for marking up screenshots and plans — heat, draw, text, images, layers. Fast, keyboard-driven, nothing to sign into.",
+  link:"", linkTxt:""},
+
+ {n:"Tallywap", plat:"Web app · Windows", f:"web", status:"live",
+  price:"Free",
+  d:"A tally board for anything you want to keep score of. Challenge yourself, skip, edit, move, and see where the count has been.",
+  link:"", linkTxt:""},
+
+ {n:"EWISP", plat:"Web app", f:"web", status:"live",
+  price:"Free · $5 unlock",
+  d:"A quiet posting board — write, comment, and read without the feed shouting at you. A small one-time unlock opens the special section.",
+  link:"", linkTxt:""},
+
+ {n:"Talent Tree", plat:"Web app", f:"web", status:"live",
+  price:"Free",
+  d:"Map anything you're learning as a branching tree. Drag to pan, scroll to zoom, drop a video into any node, tick it off when it's yours. Exports to a single file.",
+  link:"", linkTxt:""},
+
+ {n:"Docket", plat:"Web app · mobile", f:"web", status:"soon",
+  price:"In development",
+  d:"Photograph any licence, permit, or insurance certificate. It reads the dates, builds a renewal calendar, and escalates reminders until you've handled it — so a small business never gets fined for a lapse.",
+  link:"", linkTxt:""}
+];
+
+const grid = document.getElementById('grid');
+function render(f){
+  grid.innerHTML = APPS.filter(a => f==='all' || a.f===f).map(a => `
+   <div class="card">
+     <span class="plat">${a.plat}</span>
+     <h3>${a.n}</h3>
+     <p>${a.d}</p>
+     <div class="foot">
+       <span class="pill ${a.status==='live'?'live':'soon'}">${a.status==='live'?'Available':'Coming soon'}</span>
+       <span class="pill price">${a.price}</span>
+       ${a.link?`<a class="go" href="${a.link}">${a.linkTxt} &rarr;</a>`:''}
+     </div>
+   </div>`).join('');
+}
+render('all');
+document.querySelectorAll('.filters button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.filters button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    render(b.dataset.f);
+  };
+});
+document.getElementById('yr').textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
