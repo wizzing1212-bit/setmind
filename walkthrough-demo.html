@@ -1,0 +1,586 @@
+<!--
+  Walk Star — interactive walkthrough for the website.
+
+  ONE FILE, NO DEPENDENCIES. Drop it on any page with:
+      <iframe src="walkthrough-demo.html" style="width:100%;max-width:420px;
+              height:760px;border:0;border-radius:28px"></iframe>
+  or just paste the whole thing into a page. No build step, no CDN, no fonts to
+  fetch — it works from a file:// URL, which means you can double-click it to
+  check it before it ever goes near a server.
+
+  WHAT IT IS: the app's eight-screen walkthrough, rebuilt in canvas. Same
+  sequence, same words, same beats — make a star, feel a trigger, watch the
+  sky fill. Deliberately NOT a video: the whole product is a thing that
+  interrupts you and asks for a press, and you cannot feel a press by watching
+  someone else do it.
+
+  WHAT IT IS NOT: the real renderer. The app draws with Skia and runs real
+  orbital maths; this is a faithful impression at a fraction of the code. If
+  the two ever disagree, the app is right.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Walk Star — try it</title>
+<style>
+  :root{
+    --bg:#05060c; --panel:#12152a; --ink:#e4e8ee; --dim:#aeb6c8;
+    --faint:rgba(148,163,184,.25); --accent:#1d4ed8; --gold:#fcd34d;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); display:flex; align-items:center; justify-content:center;
+    user-select:none;
+  }
+  /* touch-action:none is not cosmetic. Without it a phone treats the swipe on
+     the trigger screen as a scroll attempt, cancels the pointer stream, and the
+     "say no" gesture silently never fires. */
+  #stage{position:relative;width:100%;height:100%;max-width:430px;overflow:hidden;
+         touch-action:none}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  .layer{position:absolute;inset:0;display:flex;flex-direction:column;
+         align-items:center;justify-content:center;padding:28px;text-align:center;
+         pointer-events:none}
+  .layer.on{pointer-events:auto}
+
+  .card{background:rgba(10,12,30,.94);border:1px solid rgba(148,163,184,.16);
+        border-radius:20px;padding:26px 22px;max-width:340px;width:100%;
+        backdrop-filter:blur(6px)}
+  .card.sheer{background:rgba(10,12,30,.72)}
+
+  /* SHEET — for the two screens where you are adjusting the star.
+     A centred card covers the very thing you are adjusting. On those screens
+     the panel drops to the bottom of the glass and the sky lifts the star up
+     above it, so your thumb is on the slider and your eyes are on the star. */
+  .layer.sheet{justify-content:flex-end;padding:0}
+  .sheet .card{max-width:none;border-radius:22px 22px 0 0;border-bottom:0;
+    padding:18px 22px 22px;background:rgba(8,10,24,.90)}
+  .sheet h2{font-size:17px}
+  .sheet p{font-size:13px;margin-top:6px}
+  .sheet .field{margin-top:11px}
+  .sheet .primary{margin-top:16px;padding:12px 30px}
+
+  h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+     margin:0 0 14px;font-weight:600}
+  h2{font-size:22px;line-height:1.32;margin:0;font-weight:700}
+  p{font-size:14.5px;line-height:1.55;color:var(--dim);margin:12px 0 0}
+
+  button{font:inherit;cursor:pointer;border-radius:14px;border:1px solid transparent}
+  .primary{background:var(--accent);color:#fff;font-weight:700;font-size:15px;
+           padding:13px 30px;margin-top:22px;width:100%}
+  .primary[disabled]{background:#2a3040;color:#7e8798;cursor:default}
+  .minor{background:transparent;border-color:var(--faint);color:var(--dim);
+         font-weight:700;padding:13px 16px;margin-top:22px}
+  .row{display:flex;gap:9px;width:100%}
+
+  input[type=text]{width:100%;background:transparent;border:0;
+    border-bottom:1px solid var(--faint);color:var(--gold);font:800 25px/1.3 inherit;
+    text-align:center;padding:9px 0;outline:none}
+  input[type=text]::placeholder{color:rgba(148,163,184,.4)}
+
+  .field{margin-top:16px;text-align:left}
+  .field label{display:flex;justify-content:space-between;font-size:12px;
+               color:var(--dim);margin-bottom:7px}
+  input[type=range]{-webkit-appearance:none;width:100%;height:26px;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+    background:rgba(148,163,184,.25)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;
+    border-radius:50%;background:var(--thumb,#fcd34d);margin-top:-8px;
+    box-shadow:0 0 12px var(--thumb,#fcd34d)}
+  input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:rgba(148,163,184,.25)}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;border:0;border-radius:50%;
+    background:var(--thumb,#fcd34d)}
+
+  .swatches{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+  .sw{width:34px;height:34px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+  .sw[aria-pressed=true]{border-color:#fff}
+
+  .dots{display:flex;gap:5px;justify-content:center;margin:16px 0 2px}
+  .dot{width:6px;height:6px;border-radius:3px;background:rgba(148,163,184,.25);transition:.25s}
+  .dot.on{background:var(--gold);width:16px}
+  .dot.done{background:rgba(252,211,77,.45)}
+
+  /* the trigger screen sits on the sky, not over a card */
+  .guide{position:absolute;top:11%;left:0;right:0;padding:0 34px;text-align:center}
+  .guide h2{font-size:19px}
+  .guide p{font-size:13.5px}
+  .hint{position:absolute;bottom:12%;left:0;right:0;text-align:center;
+        color:rgba(228,206,134,.8);font-size:13px;letter-spacing:.04em;
+        animation:breathe 2.6s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+  .reveal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+          background:rgba(0,0,17,.72);font-size:30px;font-weight:800;letter-spacing:.01em}
+
+  .replay{position:absolute;top:12px;right:12px;background:rgba(148,163,184,.12);
+          border:1px solid var(--faint);color:var(--dim);font-size:11.5px;
+          padding:7px 12px;border-radius:999px;z-index:5}
+  .fade{animation:fade .45s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="sky"></canvas>
+  <div id="ui" class="layer on"></div>
+  <button class="replay" id="replay" hidden>Start over</button>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const cv = document.getElementById('sky'), ctx = cv.getContext('2d');
+  const ui = document.getElementById('ui');
+  const replayBtn = document.getElementById('replay');
+
+  // ── the star being built ──────────────────────────────────────────────────
+  const star = { name:'', color:'#f4c33d', glow:.55, wiggle:.9, points:5, interval:150 };
+  let particles = [], t0 = performance.now(), holdStart = 0, holding = false;
+  let showTime = false, blooming = false;
+
+  // Where the star sits, and how big. Both animate, because the panel slides
+  // and a star that teleports out from under it looks like a bug.
+  let camY = 0.42, camYTarget = 0.42, camR = 0.085, camRTarget = 0.085;
+  const setCam = (y, r) => { camYTarget = y; camRTarget = r ?? 0.085; };
+
+  const PALETTE = ['#f4c33d','#5eead4','#8fd3ff','#c4a7e7','#fb7185','#86efac'];
+
+  // ── canvas ────────────────────────────────────────────────────────────────
+  let W = 0, H = 0, DPR = 1;
+  function resize(){
+    DPR = Math.min(devicePixelRatio || 1, 2);
+    W = stage.clientWidth; H = stage.clientHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  addEventListener('resize', resize); resize();
+
+  // Background stars — fixed, so the sky feels like a place rather than noise.
+  const bg = Array.from({length:70}, () => ({
+    x:Math.random(), y:Math.random(), r:Math.random()*1.15+.35, a:Math.random()*.4+.12
+  }));
+
+  const hex2rgb = h => {
+    const n = h.replace('#','');
+    return [0,2,4].map(i => parseInt(n.slice(i,i+2),16)).join(',');
+  };
+
+  // ── the star ──────────────────────────────────────────────────────────────
+  // A wobbling polygon rather than a clean shape: the app's stars are alive,
+  // and a perfect circle reads as a loading spinner.
+  function drawStar(cx, cy, R, time){
+    const rgb = hex2rgb(star.color);
+    const wob = star.wiggle, pts = star.points;
+    const breath = 1 + Math.sin(time*1.6)*.045;
+
+    // outer bloom, built from stacked translucent discs (cheap, and it matches
+    // how the app's glow reads: a falloff, not a hard edge)
+    for (let i=6;i>0;i--){
+      const rr = R*(1 + i*.42) * breath;
+      ctx.beginPath(); ctx.arc(cx,cy,rr,0,7);
+      ctx.fillStyle = `rgba(${rgb},${(.045*star.glow)*(1-i/8)})`;
+      ctx.fill();
+    }
+
+    // body
+    ctx.beginPath();
+    const STEPS = 120;
+    for (let i=0;i<=STEPS;i++){
+      const th = i/STEPS * Math.PI*2;
+      const spikes = pts>=3 ? Math.cos(th*pts)*.17 : 0;
+      const wig = Math.sin(th*3 + time*1.1)*.05*wob + Math.sin(th*5 - time*.8)*.03*wob;
+      const r = R * breath * (1 + spikes + wig);
+      const x = cx + Math.cos(th)*r, y = cy + Math.sin(th)*r;
+      i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    }
+    ctx.closePath();
+    const g = ctx.createRadialGradient(cx,cy,R*.12,cx,cy,R*1.25);
+    g.addColorStop(0,'#ffffff');
+    g.addColorStop(.28,`rgba(${rgb},.98)`);
+    g.addColorStop(1,`rgba(${rgb},.30)`);
+    ctx.fillStyle = g; ctx.fill();
+
+    // the charge under a held finger
+    if (holding){
+      const p = Math.min(1,(performance.now()-holdStart)/900);
+      ctx.beginPath(); ctx.arc(cx,cy,R*1.9,-Math.PI/2,-Math.PI/2 + p*Math.PI*2);
+      ctx.strokeStyle = `rgba(255,255,255,${.35+p*.5})`;
+      ctx.lineWidth = 3; ctx.stroke();
+    }
+  }
+
+  function drawParticles(cx, cy, time){
+    const rgb = hex2rgb(star.color);
+    // Particles with a life expire. This is not decoration — it is the entire
+    // lesson of the interval screen: a short interval makes something bright,
+    // close and brief; a long one makes something distant that stays.
+    particles = particles.filter(p => !p.life || (time - p.born) < p.life);
+    particles.forEach(p => {
+      const age = time - p.born;
+      let fade = 1;
+      if (p.life){
+        const left = p.life - age;
+        fade = Math.min(1, left / (p.life * 0.35));   // dim as it runs out
+      }
+      const ang = p.ang + age * p.spd * p.dir;
+      // anchor: the first particle of a run orbits the star, the rest orbit it
+      let ox = cx, oy = cy;
+      if (p.anchor){
+        const a2 = p.anchor.ang + age * p.anchor.spd * p.anchor.dir;
+        ox = cx + Math.cos(a2)*p.anchor.rad;
+        oy = cy + Math.sin(a2)*p.anchor.rad*.92;
+      }
+      const x = ox + Math.cos(ang)*p.rad, y = oy + Math.sin(ang)*p.rad*.92;
+      const grow = Math.min(1, age*3.2);
+      const s = p.size * grow;
+      for (let i=3;i>0;i--){
+        ctx.beginPath(); ctx.arc(x,y,s*(1+i*1.5),0,7);
+        ctx.fillStyle = `rgba(${rgb},${.05*star.glow*(1-i/4)*fade})`; ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(x,y,s,0,7);
+      ctx.fillStyle = `rgba(255,255,255,${(.55+.45*grow)*fade})`; ctx.fill();
+    });
+  }
+
+  // ── WHY THE LOOP CATCHES ITS OWN ERRORS ──────────────────────────────────
+  // A throw inside a requestAnimationFrame callback does not just skip a
+  // frame — it never schedules the next one. The animation stops dead, and
+  // what you SEE is whatever had been painted before the throw: background and
+  // particles, but no star, because the star is drawn last. That looks exactly
+  // like "the star disappeared" and sends you hunting the wrong thing.
+  //
+  // So: one bad frame is survivable, and it says so on the glass instead of
+  // dying quietly in a console nobody has open.
+  let lastErr = '';
+  function frame(now){
+    try { paint(now); }
+    catch (e) {
+      lastErr = (e && e.message) || String(e);
+      ctx.fillStyle = 'rgba(255,120,120,.95)';
+      ctx.font = '600 12px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('render: ' + lastErr, W/2, H - 18);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function paint(now){
+    const time = (now - t0)/1000;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,W,H);
+    bg.forEach(s => {
+      ctx.beginPath(); ctx.arc(s.x*W, s.y*H, s.r, 0, 7);
+      ctx.fillStyle = `rgba(255,255,255,${s.a})`; ctx.fill();
+    });
+
+    camY += (camYTarget - camY) * 0.07;
+    camR += (camRTarget - camR) * 0.07;
+    const cx = W/2, cy = H*camY, R = Math.min(W,H)*camR;
+    drawParticles(cx, cy, time);
+    drawStar(cx, cy, R, time);
+
+    if (showTime){
+      ctx.font = '600 26px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      const d = new Date();
+      ctx.fillText(`${d.getHours()%12||12}:${String(d.getMinutes()).padStart(2,'0')}`, cx, cy);
+    }
+  }
+  requestAnimationFrame(frame);
+
+  // ── particles ─────────────────────────────────────────────────────────────
+  let lastAnchor = null;
+  function spawn(isLeader, radius, life){
+    const time = (performance.now()-t0)/1000;
+    const base = Math.min(W,H);
+    const p = {
+      born:time, ang:Math.random()*7, dir:Math.random()>.5?1:-1,
+      spd:.18+Math.random()*.12, size:2.4, life: life || 0,
+      rad: radius ?? base*(0.10 + Math.random()*0.02),
+      anchor:null
+    };
+    if (isLeader || !lastAnchor){ lastAnchor = p; p.size = 3.4; }
+    else { p.anchor = lastAnchor; p.rad = base*0.035; p.spd = .5; }
+    particles.push(p);
+    // A hard ceiling. Nothing in the demo should ever reach it, which is
+    // exactly why it should be here — the one that does is the bug.
+    if (particles.length > 80) particles.splice(0, particles.length - 80);
+  }
+
+  // ── the flow ──────────────────────────────────────────────────────────────
+  const el = (h) => { ui.innerHTML = h; return ui.firstElementChild; };
+  const card = (inner, sheer) =>
+    el(`<div class="card ${sheer?'sheer':''} fade">${inner}</div>`);
+
+  const dots = (i,n)=>`<div class="dots">${
+    Array.from({length:n},(_,k)=>`<div class="dot ${k===i?'on':k<i?'done':''}"></div>`).join('')}</div>`;
+
+  const fmt = m => m<60 ? `${m} minutes` : `${(m/60).toFixed(m%60?1:0)} hours`;
+
+  function screen1(){
+    ui.className='layer on';
+    card(`<h1>Walk Star</h1>
+      <h2>Walk Star reprograms your subconscious.</h2>
+      <button class="primary" id="go">Go on</button>`);
+    go.onclick = screen2;
+  }
+
+  function screen2(){
+    card(`<h2 style="font-size:19px">Enter a priority</h2>
+      <p>A feeling, habit, goal, or problem.</p>
+      ${dots(0,4)}
+      <input type="text" id="nm" placeholder="name it" maxlength="24" autocomplete="off">
+      <button class="primary" id="go" disabled>Next</button>`);
+    const nm = document.getElementById('nm');
+    nm.oninput = () => { star.name = nm.value.trim(); go.disabled = !star.name; };
+    nm.onkeydown = e => { if(e.key==='Enter' && star.name) screen3(); };
+    go.onclick = screen3;
+    setTimeout(()=>nm.focus(),120);
+  }
+
+  function screen3(){
+    // panel to the floor, star lifted clear of it
+    ui.className = 'layer on sheet';
+    setCam(0.21, 0.105);
+    card(`<h2>Customise it</h2>
+      <p>Watch it change. Make it distinct enough to recognise without its name.</p>
+      ${dots(1,4)}
+      <div class="swatches" id="sw">${PALETTE.map(c=>
+        `<button class="sw" data-c="${c}" style="background:${c}"
+                 aria-pressed="${c===star.color}"></button>`).join('')}</div>
+      <div class="field"><label><span>Glow</span></label>
+        <input type="range" id="s1" min="0" max="1" step=".01" value="${star.glow}"></div>
+      <div class="field"><label><span>Edge wiggle</span></label>
+        <input type="range" id="s2" min="0" max="2" step=".01" value="${star.wiggle}"></div>
+      <div class="field"><label><span>Points</span></label>
+        <input type="range" id="s3" min="0" max="8" step="1" value="${star.points}"></div>
+      <button class="primary" id="go">Next</button>`);
+    const paint = () => {
+      ui.querySelectorAll('input[type=range]').forEach(r=>r.style.setProperty('--thumb',star.color));
+      ui.querySelectorAll('.sw').forEach(b=>b.setAttribute('aria-pressed', b.dataset.c===star.color));
+    };
+    sw.onclick = e => { const b=e.target.closest('.sw'); if(!b)return; star.color=b.dataset.c; paint(); };
+    s1.oninput = e => star.glow  = +e.target.value;
+    s2.oninput = e => star.wiggle= +e.target.value;
+    s3.oninput = e => star.points= +e.target.value;
+    paint();
+    go.onclick = screen4;
+  }
+
+  // ── INTERVAL: the one setting people set wrong ───────────────────────────
+  // Telling someone "the interval is how often it asks" teaches them nothing,
+  // because the interval does not only control frequency — it controls how far
+  // out the answer is born and how long it survives. So this screen does not
+  // explain it. It spawns particles at the current setting, live, and lets the
+  // slider do the teaching: drag left and they crowd in and blink out; drag
+  // right and they drift wide and stay.
+  const INT_MIN = 15, INT_MAX = 600;
+  const intNorm = () => (star.interval - INT_MIN) / (INT_MAX - INT_MIN);  // 0..1
+
+  // THE FLOOR IS NOT A STYLE CHOICE (user: "i broke it by lowering the interval
+  // to the bottom of the slider"). The shortest interval used to put the orbit
+  // at 0.055 of the screen while the star's own body is 0.10 — so the closest
+  // answers were being born INSIDE the star and swallowed by it. The slider
+  // looked like it deleted them.
+  //
+  // The floor is now the star's edge plus clearance, so "close" means hugging
+  // the surface, which is what close should look like anyway.
+  const intRadius = () => Math.min(W,H) * (camRTarget*1.55 + 0.02 + intNorm()*0.17);
+  const intLife   = () => 2.2 + intNorm()*11;
+  const intDays   = () => Math.round(1 + intNorm()*26);
+
+  let intTimer = null;
+  function screen4(){
+    ui.className = 'layer on sheet';
+    setCam(0.24, 0.10);
+    particles = []; lastAnchor = null;
+
+    card(`<h2>How often?</h2>
+      <p>The longest it can go before it surprises you.</p>
+      ${dots(2,4)}
+      <div class="field">
+        <label><span>Interval</span><span id="iv" style="color:${star.color}">${fmt(star.interval)}</span></label>
+        <input type="range" id="s4" min="${INT_MIN}" max="${INT_MAX}" step="15" value="${star.interval}">
+      </div>
+      <p id="lesson" style="margin-top:4px"></p>
+      <button class="primary" id="go">Make my star</button>`);
+
+    ui.querySelector('input[type=range]').style.setProperty('--thumb',star.color);
+
+    const lesson = () => {
+      const n = intNorm();
+      document.getElementById('lesson').innerHTML = n < .34
+        ? `<b style="color:${star.color}">Short.</b> It asks often. Answers are born
+           close in and fade after about <b>${intDays()} day${intDays()>1?'s':''}</b> —
+           a tight, busy, bright little system.`
+        : n < .7
+        ? `<b style="color:${star.color}">Middle.</b> Answers sit at a comfortable
+           distance and last about <b>${intDays()} days</b>.`
+        : `<b style="color:${star.color}">Long.</b> It rarely interrupts. Answers are
+           born far out and hang there for about <b>${intDays()} days</b> —
+           a wide, slow, patient system.`;
+    };
+    lesson();
+
+    // one every 500ms, at whatever the slider says right now
+    clearInterval(intTimer);
+    intTimer = setInterval(() => spawn(true, intRadius(), intLife()), 500);
+    spawn(true, intRadius(), intLife());
+
+    s4.oninput = e => {
+      star.interval = +e.target.value;
+      iv.textContent = fmt(star.interval);
+      lesson();
+    };
+    go.onclick = () => { clearInterval(intTimer); intTimer = null; spawnFirstBeat(); };
+  }
+
+  // SCREEN 5 — the trigger. The point of the whole demo: you have to press it.
+  function spawnFirstBeat(){
+    ui.className='layer';           // hand the screen to the sky
+    ui.innerHTML='';
+    particles = []; lastAnchor = null;   // clear the interval demo
+    setCam(0.42, 0.085);
+    setTimeout(triggerScreen, 1400);
+  }
+
+  function triggerScreen(){
+    showTime = true;
+    ui.className='layer on';
+    ui.innerHTML = `
+      <div class="guide fade">
+        <h2>Remember its name? Feeling progress with it?</h2>
+        <p>Notice it doesn't tell you. Hold anywhere to say yes.</p>
+      </div>
+      <div class="hint">hold to answer</div>`;
+
+    const down = e => { e.preventDefault(); holding = true; holdStart = performance.now(); check(); };
+    const up   = () => { holding = false; };
+    const check = () => {
+      if (!holding) return;
+      if (performance.now() - holdStart >= 900){ holding = false; answered(); return; }
+      requestAnimationFrame(check);
+    };
+    stage.addEventListener('pointerdown', down);
+    stage.addEventListener('pointerup', up);
+    stage.addEventListener('pointerleave', up);
+    stage._cleanup = () => {
+      stage.removeEventListener('pointerdown', down);
+      stage.removeEventListener('pointerup', up);
+      stage.removeEventListener('pointerleave', up);
+    };
+  }
+
+  function answered(){
+    stage._cleanup && stage._cleanup();
+    showTime = false;
+    spawn(true);
+    // the name reveal — withheld while it asked, given as it lets you go
+    ui.className='layer on';
+    ui.innerHTML = `<div class="reveal fade" style="color:${star.color}">${star.name}</div>`;
+    setTimeout(noBeat, 1500);
+  }
+
+  // The "no" is not an afterthought — a walkthrough that only teaches yes
+  // teaches a scoreboard. Saying no has to feel as available as saying yes,
+  // so the demo makes you do it once before it lets you past.
+  function noBeat(){
+    showTime = true;
+    ui.className='layer on';
+    ui.innerHTML = `
+      <div class="guide fade">
+        <h2>Now see how it feels to say no.</h2>
+        <p>Swipe left to dismiss it. It breaks your chain and slows the next
+           particle down. Nothing is lost — it's drawn too.</p>
+      </div>
+      <div class="hint">swipe left &nbsp;·&nbsp; or press &larr;</div>`;
+
+    let x0 = null;
+    const down = e => { x0 = e.clientX; };
+    const move = e => {
+      if (x0 === null) return;
+      if (x0 - e.clientX > 55){ x0 = null; dismissed(); }
+    };
+    const up = () => { x0 = null; };
+    const key = e => { if (e.key === 'ArrowLeft') dismissed(); };
+    stage.addEventListener('pointerdown', down);
+    stage.addEventListener('pointermove', move);
+    stage.addEventListener('pointerup', up);
+    addEventListener('keydown', key);
+    stage._cleanup = () => {
+      stage.removeEventListener('pointerdown', down);
+      stage.removeEventListener('pointermove', move);
+      stage.removeEventListener('pointerup', up);
+      removeEventListener('keydown', key);
+    };
+  }
+
+  function dismissed(){
+    stage._cleanup && stage._cleanup();
+    showTime = false;
+    lastAnchor = null;                 // the chain breaks — that IS the mechanic
+    ui.className='layer on';
+    ui.innerHTML = `<div class="reveal fade" style="color:rgba(255,255,255,.45)">
+                      ${star.name}</div>`;
+    setTimeout(screen6, 1400);
+  }
+
+  function screen6(){
+    ui.className='layer on';
+    card(`<h2>You won't know when this pops up next time.</h2>
+      <p>This creates anticipation. Subconscious attention. Subconscious flow.</p>
+      <button class="primary" id="go">Go on</button>`);
+    go.onclick = screen7;
+  }
+
+  function screen7(){
+    card(`<h2>Consecutive presses create particle clusters and momentum.</h2>
+      <button class="primary" id="go">Go on</button>`);
+    go.onclick = finale;
+  }
+
+  function finale(){
+    ui.className='layer'; ui.innerHTML='';
+    blooming = true;
+    // two waves: a short interval born close in, a long one born far out —
+    // the same lesson the app teaches on its last screen
+    const base = Math.min(W,H);
+    let n = 0;
+    const wave = (count, radius, gap, delay) => {
+      for (let i=0;i<count;i++)
+        setTimeout(()=>spawn(i%3===0, radius), delay + i*gap);
+    };
+    wave(10, base*0.075, 150, 0);        // close and quick
+    wave(14, base*0.20, 150, 2100);      // far out and long-lived
+    setTimeout(()=>{
+      ui.className='layer on';
+      card(`<h2>By the time your star populates you will have achieved
+             subconscious success.</h2>
+            <p style="margin-top:14px">So let it hit you.</p>
+            <button class="primary" id="go">Let it</button>`, true);
+      go.onclick = () => {
+        ui.className='layer'; ui.innerHTML='';
+        replayBtn.hidden = false;
+      };
+    }, 5200);
+  }
+
+  replayBtn.onclick = () => {
+    clearInterval(intTimer); intTimer = null;
+    setCam(0.42, 0.085);
+    particles = []; lastAnchor = null; blooming = false; showTime = false;
+    star.name=''; star.color='#f4c33d'; star.glow=.55; star.wiggle=.9;
+    star.points=5; star.interval=150;
+    replayBtn.hidden = true;
+    screen1();
+  };
+
+  screen1();
+})();
+</script>
+</body>
+</html>
