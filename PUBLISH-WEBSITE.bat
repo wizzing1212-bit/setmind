@@ -67,10 +67,10 @@ if errorlevel 1 gh api -X PUT repos/%USER%/setmind/pages -f "source[branch]=main
 echo.
 echo   ==================================================
 echo     Your website:
+echo     https://setmind.net   (once DNS points here)
 echo     https://%USER%.github.io/setmind/
 echo.
-echo     Paste that into Stripe.
-echo     Give it 1-2 minutes to go live the first time.
+echo     Give it 1-2 minutes to go live after a change.
 echo   ==================================================
 echo.
 start "" "https://%USER%.github.io/setmind/"
